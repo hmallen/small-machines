@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Small Machines</title>
+<meta name="description" content="A hall of small machines — three live interactive exhibits: an elemental particle bench, an evolution sandbox, and a rhythm synthesizer. Walk in and operate them.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23ff5c1f'/%3E%3Cpath d='M6 22V10h4l3 7 3-7h4v12h-3v-7l-3 7h-2l-3-7v7z' fill='%230b0c0d'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil:opsz,wght@10..72,500;10..72,700;10..72,800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --soot:      #0b0c0d;
+    --steel:     #16181b;
+    --steel-2:   #1b1e22;
+    --plate:     #1a1d21;
+    --line:      #2b2f35;
+    --line-soft: #22262b;
+    --bolt:      #3a3f46;
+    --chalk:     #e8e6df;
+    --ink-dim:   #9b9e98;
+    --ink-faint: #8a8e85;
+    --hazard:    #ff5c1f;
+    --hazard-deep: #b23c12;
+    --stencil: "Big Shoulders Stencil", "Arial Narrow", "Franklin Gothic Medium", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+    /* the three machines' own paint chips — the only foreign chroma the hall admits */
+    --paint-crucible:   #c9a227;
+    --paint-primordium: #4fd99b;
+    --paint-pulsework:  #ffb03a;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scrollbar-color: var(--bolt) var(--soot); }
+  body {
+    background:
+      radial-gradient(120% 90% at 50% 0%, #131417 0%, var(--soot) 58%),
+      var(--soot);
+    color: var(--chalk);
+    font-family: var(--mono);
+    font-size: 14px;
+    line-height: 1.55;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  ::selection { background: var(--hazard); color: var(--soot); }
+  :focus-visible { outline: 2px solid var(--hazard); outline-offset: 2px; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--soot); }
+  ::-webkit-scrollbar-thumb { background: var(--bolt); border: 2px solid var(--soot); border-radius: 5px; }
+
+  /* concrete grain over the whole floor */
+  body::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1;
+    opacity: .05; mix-blend-mode: screen;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+  }
+
+  .hall { position: relative; z-index: 2; max-width: 1320px; margin: 0 auto; padding: 0 28px 56px; }
+
+  /* ---------------------------------------------------------- hazard strip -- */
+  .hazard-strip {
+    height: 12px;
+    background: repeating-linear-gradient(135deg,
+      var(--hazard) 0 16px, #141518 16px 32px);
+    border-bottom: 1px solid #000;
+    box-shadow: 0 1px 0 rgba(255,255,255,.04);
+  }
+
+  /* ---------------------------------------------------------------- header -- */
+  header.signboard {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 32px; flex-wrap: wrap;
+    padding: 44px 0 30px;
+  }
+  .wordmark {
+    font-family: var(--stencil);
+    font-weight: 800;
+    font-size: clamp(56px, 8.6vw, 118px);
+    line-height: .86;
+    letter-spacing: .015em;
+    text-transform: uppercase;
+    color: var(--chalk);
+    text-shadow: 0 2px 0 rgba(0,0,0,.6);
+  }
+  .wordmark small {
+    display: block;
+    font-size: clamp(30px, 4.6vw, 64px);
+    font-weight: 500;
+    color: var(--ink-dim);
+    letter-spacing: .06em;
+  }
+  .plant-data {
+    font-size: 12px; line-height: 2.05;
+    color: var(--ink-dim);
+    min-width: 300px;
+    padding-bottom: 6px;
+  }
+  .plant-data .r { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; }
+  .plant-data .r .dots { flex: 1; border-bottom: 1px dotted var(--bolt); transform: translateY(-4px); min-width: 24px; }
+  .plant-data .r b { color: var(--chalk); font-weight: 600; }
+
+  /* ------------------------------------------------------------ gantry rail -- */
+  .rail {
+    position: relative; height: 10px;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line-soft);
+    background: linear-gradient(180deg, #1d2025, #14161a);
+  }
+  .rail::after { /* bolt heads along the rail */
+    content: ""; position: absolute; inset: 0;
+    background-image: radial-gradient(circle 2px at 50% 50%, var(--bolt) 0 2px, transparent 2.5px);
+    background-size: 72px 10px;
+  }
+  .rail--channel { /* the floor channel: kin to the rail, not a second rail */
+    height: 4px;
+    background: linear-gradient(180deg, #101216, #17191d);
+  }
+  .rail--channel::after { content: none; }
+
+  /* ------------------------------------------------------------------ bays -- */
+  .bays {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 30px;
+    padding-top: 34px;
+  }
+  .bay { position: relative; display: flex; flex-direction: column; }
+  .bay::before { /* drop link from the rail */
+    content: ""; position: absolute; top: -34px; left: 50%;
+    width: 2px; height: 34px; transform: translateX(-1px);
+    background: linear-gradient(180deg, var(--line), var(--bolt));
+  }
+
+  .frame {
+    position: relative;
+    background: linear-gradient(180deg, var(--steel-2), var(--steel));
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 10px;
+    box-shadow: 0 18px 40px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.05);
+    transition: border-color .18s;
+  }
+  .bay:hover .frame, .bay:focus-within .frame { border-color: #3d434b; }
+  .screw { position: absolute; width: 10px; height: 10px; color: var(--bolt); }
+  .screw.tl { top: 3px; left: 3px; } .screw.tr { top: 3px; right: 3px; }
+  .screw.bl { bottom: 3px; left: 3px; } .screw.br { bottom: 3px; right: 3px; }
+
+  .aperture {
+    position: relative;
+    background: #000;
+    border: 1px solid #000;
+    border-radius: 2px;
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.04), inset 0 0 34px rgba(0,0,0,.7);
+  }
+  .aperture .feed {
+    position: absolute; top: 0; left: 0;
+    width: var(--pw, 1024px); height: var(--ph, 720px);
+    transform: scale(var(--pscale, .3));
+    transform-origin: 0 0;
+    border: 0;
+    pointer-events: none;
+    background: #000;
+  }
+  .aperture .lamp { /* machines come on with the lamps */
+    position: absolute; inset: 0; background: #000;
+    transition: opacity 1.1s cubic-bezier(.16,1,.3,1);
+  }
+  .aperture.lit .lamp { opacity: 0; }
+  .aperture .hit {
+    position: absolute; inset: 0; z-index: 3;
+    background: transparent; border: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .aperture .hit:focus-visible { outline: 2px solid var(--hazard); outline-offset: -3px; }
+  .aperture::after { /* glass */
+    content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 2;
+    background: linear-gradient(165deg, rgba(255,255,255,.05) 0%, transparent 22%);
+  }
+  .bay:hover .feed { filter: brightness(1.08); }
+
+  /* ---------------------------------------------------------- equipment tag -- */
+  .tag {
+    margin: 12px 4px 0;
+    background: linear-gradient(180deg, var(--plate), #171a1e);
+    border: 1px solid var(--line-soft);
+    border-radius: 3px;
+    padding: 14px 16px 16px;
+    box-shadow: 0 10px 24px rgba(0,0,0,.35);
+    display: flex; flex-direction: column; gap: 8px;
+    flex: 1;
+  }
+  .tag .addr-row {
+    display: flex; align-items: center; gap: 10px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--line-soft);
+  }
+  .bay-addr {
+    font-family: var(--stencil); font-weight: 700; font-size: 17px;
+    letter-spacing: .1em; color: var(--ink-dim);
+  }
+  .paint-chip {
+    width: 9px; height: 9px; border-radius: 2px;
+    border: 1px solid rgba(0,0,0,.5);
+    box-shadow: 0 0 6px 0 currentColor;
+  }
+  .status { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .led {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #2c2f34; box-shadow: inset 0 1px 1px rgba(0,0,0,.6);
+    transition: background .2s, box-shadow .2s;
+  }
+  .led.on { background: var(--hazard); box-shadow: 0 0 8px 1px rgba(255,92,31,.55); }
+  .flap {
+    display: inline-flex; font-size: 11px; font-weight: 600; letter-spacing: .14em;
+    color: var(--ink-dim); text-transform: uppercase;
+  }
+  .flap i { font-style: normal; display: inline-block; perspective: 120px; }
+  .flap i.flip { animation: flapflip .34s steps(2) both; }
+  @keyframes flapflip {
+    0% { transform: rotateX(0); }
+    50% { transform: rotateX(-88deg); }
+    100% { transform: rotateX(0); }
+  }
+
+  .m-name {
+    font-family: var(--stencil); font-weight: 800; font-size: 34px;
+    line-height: 1; letter-spacing: .03em; text-transform: uppercase;
+    color: var(--chalk); margin-top: 2px;
+  }
+  .m-class {
+    font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .m-note { font-size: 12.5px; color: var(--ink-dim); max-width: 46ch; }
+
+  .tag .ops {
+    display: flex; align-items: center; gap: 14px;
+    margin-top: auto; padding-top: 12px;
+  }
+  .operate {
+    font-family: var(--stencil); font-weight: 800; font-size: 18px;
+    letter-spacing: .12em; text-transform: uppercase;
+    background: var(--hazard); color: var(--soot);
+    border: 1px solid var(--hazard-deep);
+    border-radius: 2px;
+    padding: 9px 20px 10px;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 10px;
+    box-shadow: 0 4px 14px rgba(255,92,31,.22), inset 0 1px 0 rgba(255,255,255,.28);
+    transition: transform .12s, box-shadow .12s, background .12s;
+  }
+  .operate:hover { background: #ff6f38; transform: translateY(-1px); box-shadow: 0 7px 18px rgba(255,92,31,.3), inset 0 1px 0 rgba(255,255,255,.28); }
+  .operate:active { transform: translateY(0); }
+  .operate svg { display: block; }
+  .direct {
+    margin-left: auto;
+    font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--ink-faint); text-decoration: none;
+    display: inline-flex; align-items: center; gap: 6px;
+    border-bottom: 1px dotted transparent;
+  }
+  .direct:hover { color: var(--ink-dim); border-bottom-color: var(--bolt); }
+
+  /* ---------------------------------------------------------------- footer -- */
+  footer { margin-top: 52px; }
+  .foot-row {
+    display: flex; align-items: center; gap: 18px;
+    padding-top: 18px;
+    font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .makers-mark {
+    margin-left: auto;
+    display: inline-flex; align-items: center; gap: 10px;
+    color: var(--ink-dim);
+  }
+  .makers-mark .stamp {
+    font-family: var(--stencil); font-weight: 800; font-size: 15px;
+    letter-spacing: .06em;
+    border: 1.5px solid var(--bolt); border-radius: 2px;
+    padding: 2px 7px 3px; color: var(--ink-dim);
+    transform: rotate(-2deg);
+  }
+
+  /* ---------------------------------------------------------------- viewer -- */
+  .viewer {
+    position: fixed; inset: 0; z-index: 50;
+    display: none; flex-direction: column;
+    background: var(--soot);
+  }
+  .viewer.open { display: flex; }
+  .hall-bar {
+    display: flex; align-items: center; gap: 14px;
+    height: 46px; padding: 0 12px;
+    background: linear-gradient(180deg, var(--steel-2), var(--steel));
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+  .hall-bar .bar-btn {
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+    letter-spacing: .12em; text-transform: uppercase;
+    background: transparent; color: var(--ink-dim);
+    border: 1px solid var(--line); border-radius: 2px;
+    padding: 6px 12px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: color .12s, border-color .12s;
+  }
+  .hall-bar .bar-btn:hover { color: var(--chalk); border-color: var(--bolt); }
+  .hall-bar .v-title {
+    display: flex; align-items: baseline; gap: 12px;
+    font-family: var(--stencil); font-weight: 700; font-size: 19px;
+    letter-spacing: .08em; text-transform: uppercase;
+  }
+  .hall-bar .v-title .v-addr { color: var(--ink-faint); font-size: 14px; white-space: nowrap; }
+  .hall-bar .v-title span { white-space: nowrap; }
+  .hall-bar .v-status { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .hall-bar .switch { display: flex; gap: 6px; }
+  .viewer iframe.live { flex: 1; border: 0; width: 100%; background: #000; }
+
+  /* ------------------------------------------------------- entrance motion -- */
+  .powerup .bay { opacity: 0; transform: translateY(14px); }
+  .powered .bay {
+    opacity: 1; transform: none;
+    transition: opacity .7s cubic-bezier(.16,1,.3,1), transform .7s cubic-bezier(.16,1,.3,1);
+  }
+  .powered .bay:nth-child(2) { transition-delay: .12s; }
+  .powered .bay:nth-child(3) { transition-delay: .24s; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .powerup .bay, .powered .bay { opacity: 1; transform: none; transition: none; }
+    .aperture .lamp { transition: none; }
+    .flap i.flip { animation: none; }
+    .operate, .operate:hover { transform: none; transition: none; }
+  }
+
+  /* ------------------------------------------------------------ responsive -- */
+  @media (max-width: 1080px) {
+    .bays { grid-template-columns: 1fr; max-width: 640px; margin: 0 auto; gap: 44px; }
+    .bay::before { height: 30px; top: -30px; }
+    .bay + .bay::before { height: 44px; top: -44px; }
+    header.signboard { padding: 34px 0 26px; }
+  }
+  @media (max-width: 640px) {
+    .hall { padding: 0 16px 40px; }
+    .plant-data { min-width: 0; width: 100%; }
+    .m-name { font-size: 28px; }
+    .hall-bar .v-title { font-size: 15px; }
+    .hall-bar .bar-btn .btn-text { display: none; }
+    .foot-row { flex-wrap: wrap; row-gap: 8px; }
+  }
+</style>
+</head>
+<body>
+<!--
+THESIS: a plant floor, not a portfolio grid — three live machines mounted in bays
+off one gantry rail; the hall refuses the screenshot-card gallery.
+OWN-WORLD: soot and steel, chalk stencil signage (Big Shoulders Stencil) with
+IBM Plex Mono as plant standard; one safety-orange hazard band; all other
+chroma belongs to the machines glowing in their apertures. Raises: achromatic
+active-band color (cloud-edge), one governing rail line (curved-crease),
+split-flap status readouts (concourse), corner-locked maker's stamp (toyism).
+STORY: a visitor sees three machines already alive, reads the equipment tag,
+presses OPERATE, and is inside the machine; RETURN TO HALL brings them back.
+FIRST VIEWPORT: hazard strip, giant stencil wordmark with plant-data log right,
+the rail, three bays hanging from it — live feeds over tags with OPERATE.
+FORM: machine-hall / turbine floor, candidate 6 of 7, seed df7c0253.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the
+finish review, the verdict, DESIGN.md, and every shipping raster carrying its
+provenance.
+-->
+<div class="hazard-strip" aria-hidden="true"></div>
+
+<noscript>
+  <div style="padding:24px 28px; font-family:monospace;">
+    <p>The hall needs JavaScript for its live bays. The machines run fine without it:</p>
+    <ul style="margin:12px 0 0 24px; line-height:2;">
+      <li><a style="color:#ff5c1f" href="crucible.html">Crucible — elemental particle bench</a></li>
+      <li><a style="color:#ff5c1f" href="primordium.html">Primordium — evolution sandbox</a></li>
+      <li><a style="color:#ff5c1f" href="pulsework.html">Pulsework — MK-I rhythm synthesizer</a></li>
+    </ul>
+  </div>
+</noscript>
+
+<div class="hall">
+  <header class="signboard">
+    <h1 class="wordmark">Small<small>Machines</small></h1>
+    <div class="plant-data" role="list" aria-label="Hall register">
+      <div class="r" role="listitem"><span>HALL OF SMALL MACHINES</span><span class="dots"></span><b>EST. 2026</b></div>
+      <div class="r" role="listitem"><span>UNITS IN SERVICE</span><span class="dots"></span><b>03</b></div>
+      <div class="r" role="listitem"><span>ADMISSION</span><span class="dots"></span><b>FREE</b></div>
+      <div class="r" role="listitem"><span>VISITORS</span><span class="dots"></span><b>OPERATE FREELY</b></div>
+    </div>
+  </header>
+
+  <div class="rail" aria-hidden="true"></div>
+
+  <main class="bays powerup" id="bays" aria-label="Machine bays"></main>
+
+  <footer>
+    <div class="rail rail--channel" aria-hidden="true"></div>
+    <div class="foot-row">
+      <span>Small Machines · a static hall · plain files, no backend</span>
+      <span class="makers-mark"><span>machined &amp; kept by the resident tinkerer</span><span class="stamp">SM/26</span></span>
+    </div>
+  </footer>
+</div>
+
+<div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-label="Machine operator view">
+  <div class="hall-bar">
+    <button class="bar-btn" id="backBtn" aria-label="Return to hall">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 1.5 3 6l4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="btn-text">Return to hall</span>
+    </button>
+    <div class="v-title"><span class="v-addr" id="vAddr">BAY 01</span><span id="vName">—</span></div>
+    <div class="v-status">
+      <div class="switch">
+        <button class="bar-btn" id="prevBtn" aria-label="Previous machine">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 1.5 3 6l4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="bar-btn" id="nextBtn" aria-label="Next machine">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 1.5 9 6l-4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+      <span class="led on" aria-hidden="true"></span>
+      <span class="flap" id="vStatus" role="status">OPERATING</span>
+    </div>
+  </div>
+  <iframe class="live" id="liveFrame" title="Machine" src="about:blank"></iframe>
+</div>
+
+<script>
+'use strict';
+
+/* ------------------------------------------------------------- the register --
+   Add a machine to the hall: drop its self-contained .html next to this file
+   and add one entry here. Nothing else to edit.                              */
+const MACHINES = [
+  {
+    slug: 'crucible', file: 'crucible.html', name: 'Crucible',
+    klass: 'Elemental bench no. 5',
+    note: 'Paint elements onto the bench and let them react — sand piles, water floods, fire spreads, lightning strikes.',
+    paint: 'var(--paint-crucible)',
+    attract: 'crucible',
+  },
+  {
+    slug: 'primordium', file: 'primordium.html', name: 'Primordium',
+    klass: 'Evolution sandbox · specimen 001',
+    note: 'A dish of creatures with heritable speed, size and sense. Watch who eats, who breeds, who dies out.',
+    paint: 'var(--paint-primordium)',
+    attract: 'self',
+  },
+  {
+    slug: 'pulsework', file: 'pulsework.html', name: 'Pulsework',
+    klass: 'MK-I rhythm synthesizer',
+    note: 'A step grid, tuned knobs, synthesized drums and bass. Audio unit — powers on when you operate it.',
+    paint: 'var(--paint-pulsework)',
+    attract: 'standby',
+  },
+];
+
+const PREVIEW_W = 1220, PREVIEW_H = 860;
+const FLAPGLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ/#';
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const SCREW = '<svg class="screw" viewBox="0 0 10 10" fill="none" aria-hidden="true"><circle cx="5" cy="5" r="4" stroke="currentColor" stroke-width="1.2"/><path d="M3 5h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>';
+const ARROW = '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M2.5 6.5h8m0 0L7 3m3.5 3.5L7 10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const EXT = '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M4 2H2v6h6V6M6 1.5h2.5V4M8.2 1.8 4.6 5.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+/* --------------------------------------------------------------- the bays -- */
+const baysEl = document.getElementById('bays');
+const bayState = []; // { machine, feed, aperture, statusEl, ledEl }
+
+MACHINES.forEach((m, i) => {
+  const addr = String(i + 1).padStart(2, '0');
+  const bay = document.createElement('article');
+  bay.className = 'bay';
+  bay.innerHTML = `
+    <div class="frame">
+      ${SCREW.replace('class="screw"', 'class="screw tl"')}
+      ${SCREW.replace('class="screw"', 'class="screw tr"')}
+      ${SCREW.replace('class="screw"', 'class="screw bl"')}
+      ${SCREW.replace('class="screw"', 'class="screw br"')}
+      <div class="aperture">
+        <div class="lamp" aria-hidden="true"></div>
+        <button class="hit" tabindex="-1" aria-hidden="true"></button>
+      </div>
+    </div>
+    <div class="tag">
+      <div class="addr-row">
+        <span class="bay-addr">BAY ${addr}</span>
+        <span class="paint-chip" style="color:${m.paint}; background:${m.paint}" title="Machine livery"></span>
+        <span class="status"><span class="led" aria-hidden="true"></span><span class="flap" role="status" aria-label="Status"></span></span>
+      </div>
+      <h2 class="m-name">${m.name}</h2>
+      <div class="m-class">${m.klass}</div>
+      <p class="m-note">${m.note}</p>
+      <div class="ops">
+        <button class="operate">Operate ${ARROW}</button>
+        <a class="direct" href="${m.file}">Standalone ${EXT}</a>
+      </div>
+    </div>`;
+  baysEl.appendChild(bay);
+
+  const aperture = bay.querySelector('.aperture');
+  const feed = document.createElement('iframe');
+  feed.className = 'feed';
+  feed.title = `${m.name} — live preview (decorative)`;
+  feed.setAttribute('aria-hidden', 'true');
+  feed.setAttribute('tabindex', '-1');
+  feed.setAttribute('scrolling', 'no');
+  feed.loading = 'lazy';
+  feed.src = m.file;
+  aperture.insertBefore(feed, aperture.querySelector('.hit'));
+
+  const statusEl = bay.querySelector('.flap');
+  const ledEl = bay.querySelector('.led');
+  setFlap(statusEl, 'POWERING');
+
+  feed.addEventListener('load', () => {
+    try { // previews are exhibits behind glass: no scrollbars in the aperture
+      const doc = feed.contentDocument;
+      doc.documentElement.style.overflow = 'hidden';
+      const s = doc.createElement('style');
+      s.textContent = '::-webkit-scrollbar{display:none!important} *{scrollbar-width:none!important}';
+      doc.head ? doc.head.appendChild(s) : doc.documentElement.appendChild(s);
+    } catch (_) {}
+    aperture.classList.add('lit');
+    const running = m.attract !== 'standby';
+    setFlap(statusEl, running ? 'RUNNING' : 'STANDBY');
+    ledEl.classList.toggle('on', running);
+    if (m.attract === 'crucible') startCrucibleAttract(feed);
+  });
+
+  bay.querySelector('.hit').addEventListener('click', () => openMachine(i));
+  bay.querySelector('.operate').addEventListener('click', () => openMachine(i));
+
+  bayState.push({ machine: m, feed, aperture, statusEl, ledEl });
+});
+
+requestAnimationFrame(() => requestAnimationFrame(() => {
+  baysEl.classList.remove('powerup');
+  baysEl.classList.add('powered');
+}));
+
+/* Scale each feed to its aperture. Apertures keep the preview's aspect. */
+function fitFeeds() {
+  document.querySelectorAll('.aperture').forEach(ap => {
+    const w = ap.clientWidth || ap.getBoundingClientRect().width;
+    const scale = w / PREVIEW_W;
+    ap.style.height = Math.round(PREVIEW_H * scale) + 'px';
+    ap.style.setProperty('--pscale', scale);
+    ap.style.setProperty('--pw', PREVIEW_W + 'px');
+    ap.style.setProperty('--ph', PREVIEW_H + 'px');
+  });
+}
+fitFeeds();
+new ResizeObserver(fitFeeds).observe(baysEl);
+
+/* ------------------------------------------------------- split-flap status -- */
+function setFlap(el, word) {
+  if (el.dataset.word === word) return;
+  el.dataset.word = word;
+  el.innerHTML = '';
+  [...word].forEach((ch, i) => {
+    const cell = document.createElement('i');
+    el.appendChild(cell);
+    if (reducedMotion) { cell.textContent = ch; return; }
+    let ticks = 0;
+    const maxTicks = 2 + Math.floor(Math.random() * 3);
+    cell.textContent = FLAPGLYPHS[Math.floor(Math.random() * FLAPGLYPHS.length)];
+    cell.classList.add('flip');
+    const iv = setInterval(() => {
+      ticks++;
+      if (ticks >= maxTicks) {
+        cell.textContent = ch;
+        cell.classList.remove('flip');
+        clearInterval(iv);
+      } else {
+        cell.textContent = FLAPGLYPHS[Math.floor(Math.random() * FLAPGLYPHS.length)];
+      }
+    }, 70 + i * 12);
+  });
+}
+
+/* ---------------------------------------------------------- attract drive --
+   The hall operates idle machines. Crucible's bench gets element strokes
+   painted through its own public controls; everything is defensive — if the
+   machine's internals change, the feed simply shows it at rest.             */
+function startCrucibleAttract(frame) {
+  if (reducedMotion) return;
+  let strokes = 0;
+  const visible = { is: true };
+  new IntersectionObserver(es => es.forEach(e => visible.is = e.isIntersecting), { threshold: .1 })
+    .observe(frame.closest('.bay'));
+
+  const tick = () => {
+    if (document.hidden || !visible.is) return;
+    try {
+      const win = frame.contentWindow, doc = frame.contentDocument;
+      if (!win || !doc || typeof win.paintLine !== 'function') return;
+      const canvas = doc.querySelector('canvas');
+      if (!canvas) return;
+      const W = canvas.width, H = canvas.height;
+      const swatches = doc.querySelectorAll('.swatch');
+      if (swatches.length) swatches[Math.floor(Math.random() * Math.min(swatches.length, 10))].click();
+      // one arced stroke across the bench
+      let x = Math.random() * W * .8 + W * .1;
+      let y = Math.random() * H * .35 + H * .08;
+      const segs = 3 + Math.floor(Math.random() * 3);
+      for (let s = 0; s < segs; s++) {
+        const nx = Math.max(2, Math.min(W - 2, x + (Math.random() - .5) * W * .3));
+        const ny = Math.max(2, Math.min(H - 2, y + Math.random() * H * .12));
+        win.paintLine(Math.round(x), Math.round(y), Math.round(nx), Math.round(ny));
+        x = nx; y = ny;
+      }
+      strokes++;
+      if (strokes % 16 === 0) { // wipe the bench before it silts up
+        const clear = doc.getElementById('clearBtn');
+        if (clear) clear.click();
+      }
+    } catch (_) { /* machine declined the operator's hand; leave it be */ }
+  };
+  setInterval(tick, 2600);
+  setTimeout(tick, 900);
+}
+
+/* ---------------------------------------------------------------- viewer -- */
+const viewer = document.getElementById('viewer');
+const liveFrame = document.getElementById('liveFrame');
+const vAddr = document.getElementById('vAddr');
+const vName = document.getElementById('vName');
+const vStatus = document.getElementById('vStatus');
+let current = -1;
+let lastFocus = null;
+
+function openMachine(i) { location.hash = '#/' + MACHINES[i].slug; }
+function closeMachine() { location.hash = ''; }
+
+document.getElementById('backBtn').addEventListener('click', closeMachine);
+document.getElementById('prevBtn').addEventListener('click', () => {
+  if (current >= 0) openMachine((current + MACHINES.length - 1) % MACHINES.length);
+});
+document.getElementById('nextBtn').addEventListener('click', () => {
+  if (current >= 0) openMachine((current + 1) % MACHINES.length);
+});
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && current >= 0) closeMachine();
+});
+
+function applyHash() {
+  const slug = (location.hash.match(/^#\/([\w-]+)/) || [])[1];
+  const idx = MACHINES.findIndex(m => m.slug === slug);
+  if (idx >= 0) {
+    const m = MACHINES[idx];
+    const wasOpen = current >= 0;
+    current = idx;
+    vAddr.textContent = 'BAY ' + String(idx + 1).padStart(2, '0');
+    vName.textContent = m.name;
+    setFlap(vStatus, 'OPERATING');
+    liveFrame.title = m.name;
+    liveFrame.src = m.file;
+    if (!wasOpen) {
+      lastFocus = document.activeElement;
+      viewer.classList.add('open');
+      document.body.style.overflow = 'hidden';
+      document.querySelector('.hall').inert = true;
+    }
+    document.getElementById('backBtn').focus();
+    document.title = m.name + ' — Small Machines';
+  } else {
+    current = -1;
+    viewer.classList.remove('open');
+    liveFrame.src = 'about:blank';
+    document.body.style.overflow = '';
+    document.querySelector('.hall').inert = false;
+    document.title = 'Small Machines';
+    if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
+  }
+}
+window.addEventListener('hashchange', applyHash);
+applyHash();
+</script>
+</body>
+</html>

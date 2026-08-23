@@ -1,0 +1,899 @@
+<title>Crucible</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ground: #16130e;
+    --panel: #1f1a13;
+    --panel-edge: #2e261a;
+    --ink: #e8dcc4;
+    --ink-dim: #9d8f73;
+    --brass: #c9a227;
+    --brass-soft: #8a6f4d;
+    --danger: #c14b32;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+  }
+  #app { display: flex; flex-direction: column; height: 100%; }
+
+  header {
+    display: flex; align-items: center; gap: 16px;
+    padding: 8px 14px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--panel-edge);
+    flex-wrap: wrap;
+  }
+  .wordmark {
+    font-family: Cinzel, Georgia, serif;
+    font-weight: 700;
+    font-size: 20px;
+    letter-spacing: 0.14em;
+    color: var(--brass);
+    text-transform: uppercase;
+  }
+  .wordmark span { color: var(--ink-dim); font-size: 11px; letter-spacing: 0.22em; display: block; font-family: "IBM Plex Mono", monospace; font-weight: 400; text-transform: uppercase; }
+  .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  button.ctl {
+    font-family: inherit; font-size: 11px; letter-spacing: 0.08em;
+    background: transparent; color: var(--ink);
+    border: 1px solid var(--brass-soft);
+    padding: 5px 11px; cursor: pointer; text-transform: uppercase;
+  }
+  button.ctl:hover { border-color: var(--brass); color: var(--brass); }
+  button.ctl:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+  button.ctl.danger:hover { border-color: var(--danger); color: var(--danger); }
+  button.ctl[aria-pressed="true"] { background: var(--brass); color: #16130e; border-color: var(--brass); }
+  .brush-group { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-dim); }
+  .brush-group b { color: var(--ink); min-width: 2ch; text-align: center; font-weight: 500; }
+  .readout { margin-left: auto; font-size: 10px; color: var(--ink-dim); letter-spacing: 0.06em; text-align: right; line-height: 1.5; }
+  .readout b { color: var(--ink); font-weight: 500; }
+
+  #stage { flex: 1; position: relative; min-height: 0; }
+  canvas#sim { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; cursor: none; }
+  #cursor {
+    position: absolute; pointer-events: none;
+    border: 1px solid rgba(232, 220, 196, 0.85);
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.6);
+    transform: translate(-50%, -50%);
+    display: none;
+  }
+
+  footer {
+    background: var(--panel);
+    border-top: 1px solid var(--panel-edge);
+    padding: 8px 12px 10px;
+    overflow-x: auto;
+  }
+  .palette { display: flex; gap: 14px; align-items: flex-start; }
+  .group { display: flex; flex-direction: column; gap: 5px; }
+  .group-label { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-dim); }
+  .swatches { display: flex; gap: 5px; }
+  button.swatch {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    background: transparent; border: 1px solid transparent;
+    padding: 4px 6px; cursor: pointer;
+    font-family: inherit; font-size: 9px; letter-spacing: 0.04em;
+    color: var(--ink-dim); text-transform: uppercase;
+  }
+  button.swatch .chip { width: 26px; height: 18px; border: 1px solid rgba(0,0,0,0.5); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); }
+  button.swatch:hover { color: var(--ink); border-color: var(--panel-edge); }
+  button.swatch[aria-pressed="true"] { border-color: var(--brass); color: var(--brass); background: rgba(201,162,39,0.08); }
+  button.swatch:focus-visible { outline: 2px solid var(--brass); outline-offset: 1px; }
+
+  #help {
+    position: absolute; top: 12px; right: 12px; max-width: 300px;
+    background: rgba(31,26,19,0.94); border: 1px solid var(--panel-edge);
+    padding: 14px 16px; font-size: 11px; line-height: 1.7; color: var(--ink-dim);
+    display: none; z-index: 5;
+  }
+  #help.open { display: block; }
+  #help h2 { font-family: Cinzel, serif; font-size: 13px; color: var(--brass); letter-spacing: 0.1em; margin-bottom: 6px; }
+  #help kbd { color: var(--ink); background: var(--ground); border: 1px solid var(--panel-edge); padding: 0 4px; font-family: inherit; }
+  #help .rec { margin-top: 8px; border-top: 1px solid var(--panel-edge); padding-top: 8px; }
+  @media (max-width: 700px) {
+    .wordmark span { display: none; }
+    .readout { display: none; }
+  }
+</style>
+
+<div id="app">
+  <header>
+    <div class="wordmark">Crucible<span>elemental bench no. 5</span></div>
+    <div class="controls">
+      <button class="ctl" id="pauseBtn" aria-pressed="false">Pause</button>
+      <button class="ctl" id="stepBtn">Step</button>
+      <button class="ctl danger" id="clearBtn">Clear</button>
+      <button class="ctl" id="sceneBtn">Scene</button>
+      <button class="ctl" id="rainBtn" aria-pressed="false">Rain</button>
+      <button class="ctl" id="helpBtn" aria-pressed="false">?</button>
+      <div class="brush-group">
+        <button class="ctl" id="brushDown" aria-label="Smaller brush">−</button>
+        <b id="brushSize">4</b>
+        <button class="ctl" id="brushUp" aria-label="Bigger brush">+</button>
+        <span>brush</span>
+      </div>
+    </div>
+    <div class="readout">
+      <div><b id="fps">60</b> fps &nbsp;·&nbsp; <b id="count">0</b> particles</div>
+      <div>selected: <b id="selName">sand</b></div>
+    </div>
+  </header>
+
+  <div id="stage">
+    <canvas id="sim"></canvas>
+    <div id="cursor"></div>
+    <div id="help">
+      <h2>Field Notes</h2>
+      <div>Paint matter onto the bench and let it interact. Water quenches lava into stone. Lava and lightning fuse sand into glass. Oil floats, and burns. Acid devours nearly everything. Seeds sprout where sand is wet. Salt melts ice and brines water. Fuse carries a slow flame to gunpowder. Clone drinks the first element that touches it and pours it out forever; void unmakes whatever it meets. Meteors end civilizations.</div>
+      <div class="rec">
+        <kbd>Space</kbd> pause &nbsp; <kbd>[</kbd> <kbd>]</kbd> brush &nbsp; <kbd>E</kbd> erase<br>
+        Hold <kbd>Shift</kbd> for a straight line stroke.
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <nav class="palette" id="palette" aria-label="Elements"></nav>
+  </footer>
+</div>
+
+<script>
+'use strict';
+// ---------------------------------------------------------------- elements --
+const E = {
+  EMPTY: 0, WALL: 1, SAND: 2, WATER: 3, STONE: 4, LAVA: 5, FIRE: 6,
+  SMOKE: 7, STEAM: 8, WOOD: 9, PLANT: 10, SEED: 11, ACID: 12, OIL: 13,
+  POWDER: 14, ICE: 15, SALT: 16, BRINE: 17, GLASS: 18, FUSE: 19,
+  EMBER: 20, LIGHTNING: 21, NANITE: 22, METEOR: 23, CLONE: 24, VOID: 25,
+};
+
+// kind: 0 static, 1 powder, 2 liquid, 3 gas, 4 energy
+const DEF = [];
+function def(id, name, kind, density, colors, opts = {}) {
+  DEF[id] = Object.assign({ name, kind, density, colors, flam: 0, life: 0 }, opts);
+}
+def(E.EMPTY, 'empty',  0, 0,   [[22,19,14]]);
+def(E.WALL,  'wall',   0, 99,  [[74,68,58],[68,62,52],[80,73,62]]);
+def(E.SAND,  'sand',   1, 5,   [[194,164,102],[204,176,112],[184,152,94],[210,182,124]]);
+def(E.WATER, 'water',  2, 3,   [[38,88,146],[42,96,158],[34,80,134]]);
+def(E.STONE, 'stone',  0, 90,  [[104,100,94],[96,92,86],[112,108,100]]);
+def(E.LAVA,  'lava',   2, 8,   [[224,88,28],[240,120,32],[204,64,20],[248,152,48]], { hot: true });
+def(E.FIRE,  'fire',   4, 0,   [[255,150,40],[255,196,64],[236,88,24],[255,230,120]], { hot: true, life: 24 });
+def(E.SMOKE, 'smoke',  3, -2,  [[58,54,50],[66,62,57],[50,47,44]], { life: 90 });
+def(E.STEAM, 'steam',  3, -3,  [[158,168,176],[172,182,190],[144,154,162]], { life: 120 });
+def(E.WOOD,  'wood',   0, 95,  [[100,72,44],[110,80,48],[90,64,40]], { flam: 12 });
+def(E.PLANT, 'plant',  0, 94,  [[58,132,62],[70,150,72],[48,116,54]], { flam: 22 });
+def(E.SEED,  'seed',   1, 5,   [[142,168,74],[130,156,66]]);
+def(E.ACID,  'acid',   2, 4,   [[132,224,60],[112,204,48],[152,240,80]]);
+def(E.OIL,   'oil',    2, 2,   [[64,52,36],[56,46,32],[72,58,40]], { flam: 40 });
+def(E.POWDER,'gunpowder',1, 5, [[52,52,54],[60,60,62],[44,44,46]], { flam: 60 });
+def(E.ICE,   'ice',    0, 88,  [[158,204,228],[172,216,238],[144,192,218]]);
+def(E.SALT,  'salt',   1, 5,   [[228,226,218],[238,236,228],[216,214,206]]);
+def(E.BRINE, 'brine',  2, 4,   [[62,110,152],[68,120,162],[56,100,140]]);
+def(E.GLASS, 'glass',  0, 92,  [[150,178,180],[164,192,194],[138,166,170]]);
+def(E.FUSE,  'fuse',   0, 93,  [[150,108,66],[160,116,72]], { flam: 4 });
+def(E.EMBER, 'ember',  1, 5,   [[220,110,40],[240,140,50],[200,90,30]], { hot: true, life: 60 });
+def(E.LIGHTNING,'lightning',4,0,[[240,244,255],[190,210,255],[255,255,255]], { hot: true, life: 10 });
+def(E.NANITE,'nanite', 1, 6,   [[128,124,138],[144,140,154],[112,108,122]]);
+def(E.METEOR,'meteor', 1, 10,  [[255,140,60],[236,100,44],[255,180,90]], { hot: true });
+def(E.CLONE, 'clone',  0, 96,  [[156,102,196],[168,114,208],[144,92,184]]);
+def(E.VOID,  'void',   0, 97,  [[30,20,38],[42,28,52],[24,16,30]]);
+
+const PALETTE_GROUPS = [
+  ['Powders', [E.SAND, E.SALT, E.POWDER, E.SEED, E.NANITE]],
+  ['Liquids', [E.WATER, E.OIL, E.ACID, E.LAVA, E.BRINE]],
+  ['Solids',  [E.WALL, E.STONE, E.WOOD, E.ICE, E.GLASS, E.FUSE]],
+  ['Life',    [E.PLANT]],
+  ['Energy',  [E.FIRE, E.LIGHTNING, E.METEOR]],
+  ['Tools',   [E.CLONE, E.VOID, E.EMPTY]],
+];
+
+// ------------------------------------------------------------------- state --
+const CELL = 4;
+const canvas = document.getElementById('sim');
+const ctx = canvas.getContext('2d', { alpha: false });
+let W = 0, H = 0;               // grid dims
+let cells, life, shade, moved;  // typed arrays
+let img, img32;
+let frame = 0;
+let paused = false;
+let brush = 4;
+let selected = E.SAND;
+let particleCount = 0;
+
+const rngBuf = new Uint32Array(1);
+let rndState = 0x9e3779b9;
+function rnd() { // xorshift, fast
+  rndState ^= rndState << 13; rndState ^= rndState >>> 17; rndState ^= rndState << 5;
+  return (rndState >>> 0) / 4294967296;
+}
+function chance(p) { return rnd() < p; }
+
+function resize() {
+  const stage = document.getElementById('stage');
+  const w = Math.max(64, Math.floor(stage.clientWidth / CELL));
+  const h = Math.max(48, Math.floor(stage.clientHeight / CELL));
+  const old = cells ? { w: W, h: H, cells, life } : null;
+  W = w; H = h;
+  canvas.width = W; canvas.height = H;
+  cells = new Uint8Array(W * H);
+  life = new Uint8Array(W * H);
+  shade = new Uint8Array(W * H);
+  moved = new Uint8Array(W * H);
+  for (let i = 0; i < shade.length; i++) shade[i] = (rnd() * 4) | 0;
+  img = ctx.createImageData(W, H);
+  img32 = new Uint32Array(img.data.buffer);
+  if (old && userTouched) { // preserve what fits, anchored to the floor
+    const mw = Math.min(W, old.w), mh = Math.min(H, old.h);
+    for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) {
+      cells[(H - 1 - y) * W + x] = old.cells[(old.h - 1 - y) * old.w + x];
+      life[(H - 1 - y) * W + x] = old.life[(old.h - 1 - y) * old.w + x];
+    }
+  } else if (old) {
+    buildScene(); // untouched demo scene: rebuild at the new size
+  }
+}
+let userTouched = false;
+
+function idx(x, y) { return y * W + x; }
+function inb(x, y) { return x >= 0 && x < W && y >= 0 && y < H; }
+
+function set(x, y, id) {
+  const i = idx(x, y);
+  cells[i] = id;
+  life[i] = DEF[id].life ? DEF[id].life + ((rnd() * DEF[id].life * 0.5) | 0) : 0;
+  shade[i] = (rnd() * DEF[id].colors.length) | 0;
+}
+
+function swap(i, j) {
+  const a = cells[i], b = cells[j];
+  cells[i] = b; cells[j] = a;
+  const la = life[i]; life[i] = life[j]; life[j] = la;
+  const sa = shade[i]; shade[i] = shade[j]; shade[j] = sa;
+  moved[i] = 1; moved[j] = 1;
+}
+
+// ---------------------------------------------------------------- behavior --
+function isEmpty(i) { return cells[i] === E.EMPTY; }
+function densityAt(i) { return DEF[cells[i]].density; }
+function flammableAt(i) { return DEF[cells[i]].flam; }
+
+function tryIgnite(x, y, force) {
+  if (!inb(x, y)) return;
+  const i = idx(x, y);
+  const f = flammableAt(i);
+  if (f && (force || chance(f / 100))) {
+    const wasPowder = cells[i] === E.POWDER;
+    set(x, y, E.FIRE);
+    if (wasPowder) explode(x, y, 7);
+  }
+  if (cells[i] === E.ICE && chance(0.4)) set(x, y, E.WATER);
+}
+
+function explode(cx, cy, r) {
+  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    const d2 = dx * dx + dy * dy;
+    if (d2 > r * r) continue;
+    const x = cx + dx, y = cy + dy;
+    if (!inb(x, y)) continue;
+    const i = idx(x, y);
+    const id = cells[i];
+    if (id === E.WALL) continue;
+    if (id === E.POWDER) { set(x, y, E.FIRE); continue; } // chain
+    if (d2 < r * r * 0.45) set(x, y, chance(0.5) ? E.FIRE : E.SMOKE);
+    else if (flammableAt(i)) set(x, y, E.FIRE);
+    else if (id !== E.EMPTY && DEF[id].kind !== 0 && chance(0.6)) set(x, y, E.EMBER);
+  }
+}
+
+function neighborsHot(x, y) {
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    if (!dx && !dy) continue;
+    const nx = x + dx, ny = y + dy;
+    if (inb(nx, ny) && DEF[cells[idx(nx, ny)]].hot) return true;
+  }
+  return false;
+}
+
+function stepPowder(x, y, i, id) {
+  const below = idx(x, y + 1);
+  if (y + 1 < H) {
+    const bid = cells[below];
+    if (bid === E.EMPTY || (DEF[bid].kind === 2 && DEF[bid].density < DEF[id].density) || DEF[bid].kind === 3) {
+      swap(i, below); return;
+    }
+    const dir = chance(0.5) ? 1 : -1;
+    for (const dx of [dir, -dir]) {
+      const nx = x + dx;
+      if (nx < 0 || nx >= W) continue;
+      const diag = idx(nx, y + 1);
+      const did = cells[diag];
+      if (did === E.EMPTY || (DEF[did].kind === 2 && DEF[did].density < DEF[id].density)) { swap(i, diag); return; }
+    }
+  }
+}
+
+function stepLiquid(x, y, i, id, spread) {
+  const dens = DEF[id].density;
+  if (y + 1 < H) {
+    const below = idx(x, y + 1);
+    const bid = cells[below];
+    if (bid === E.EMPTY || DEF[bid].kind === 3 || (DEF[bid].kind === 2 && DEF[bid].density < dens)) {
+      swap(i, below); return;
+    }
+    const dir = chance(0.5) ? 1 : -1;
+    for (const dx of [dir, -dir]) {
+      const nx = x + dx;
+      if (nx < 0 || nx >= W) continue;
+      const diag = idx(nx, y + 1);
+      const did = cells[diag];
+      if (did === E.EMPTY || (DEF[did].kind === 2 && DEF[did].density < dens)) { swap(i, diag); return; }
+    }
+  }
+  // sideways flow
+  const dir = chance(0.5) ? 1 : -1;
+  for (let s = 1; s <= spread; s++) {
+    const nx = x + dir * s;
+    if (nx < 0 || nx >= W) break;
+    const ni = idx(nx, y);
+    const nid = cells[ni];
+    if (nid === E.EMPTY) { swap(i, ni); return; }
+    if (nid !== id && DEF[nid].kind === 2 && DEF[nid].density < dens && chance(0.5)) { swap(i, ni); return; }
+    if (DEF[nid].kind !== 2 && nid !== E.EMPTY) break;
+  }
+}
+
+function stepGas(x, y, i, id) {
+  if (life[i] > 0 && --life[i] === 0) {
+    cells[i] = id === E.STEAM && chance(0.3) ? E.WATER : E.EMPTY;
+    if (cells[i]) shade[i] = (rnd() * DEF[cells[i]].colors.length) | 0;
+    return;
+  }
+  const up = idx(x, y - 1);
+  if (y > 0) {
+    const uid = cells[up];
+    if (uid === E.EMPTY || (DEF[uid].kind === 2)) {
+      if (uid === E.EMPTY || chance(0.8)) { swap(i, up); return; }
+    }
+    const dir = chance(0.5) ? 1 : -1;
+    for (const dx of [dir, -dir]) {
+      const nx = x + dx;
+      if (nx < 0 || nx >= W) continue;
+      const diag = idx(nx, y - 1);
+      if (cells[diag] === E.EMPTY) { swap(i, diag); return; }
+    }
+  } else if (chance(0.1)) { cells[i] = E.EMPTY; return; }
+  const dir = chance(0.5) ? 1 : -1;
+  const nx = x + dir;
+  if (nx >= 0 && nx < W && cells[idx(nx, y)] === E.EMPTY && chance(0.5)) swap(i, idx(nx, y));
+}
+
+function update() {
+  moved.fill(0);
+  frame++;
+  const leftToRight = (frame & 1) === 0;
+  for (let y = H - 1; y >= 0; y--) {
+    for (let xi = 0; xi < W; xi++) {
+      const x = leftToRight ? xi : W - 1 - xi;
+      const i = idx(x, y);
+      if (moved[i]) continue;
+      const id = cells[i];
+      if (id === E.EMPTY || id === E.WALL) continue;
+
+      switch (id) {
+        case E.SAND: {
+          if (neighborsHot(x, y) && chance(0.02)) { set(x, y, E.GLASS); break; }
+          stepPowder(x, y, i, id);
+          break;
+        }
+        case E.SALT: {
+          // dissolve into adjacent water; melt adjacent ice
+          let done = false;
+          for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+            const nx = x + dx, ny = y + dy;
+            if (!inb(nx, ny)) continue;
+            const ni = idx(nx, ny);
+            if (cells[ni] === E.WATER && chance(0.35)) { set(nx, ny, E.BRINE); set(x, y, E.EMPTY); done = true; break; }
+            if (cells[ni] === E.ICE && chance(0.15)) { set(nx, ny, E.WATER); }
+          }
+          if (!done) stepPowder(x, y, i, id);
+          break;
+        }
+        case E.SEED: {
+          if (y + 1 < H) {
+            const bid = cells[idx(x, y + 1)];
+            if (bid === E.SAND || bid === E.PLANT) {
+              // sprout if moisture nearby
+              let wet = false;
+              for (let dy = -2; dy <= 2 && !wet; dy++) for (let dx = -2; dx <= 2; dx++) {
+                const nx = x + dx, ny = y + dy;
+                if (inb(nx, ny) && (cells[idx(nx, ny)] === E.WATER || cells[idx(nx, ny)] === E.BRINE)) { wet = true; break; }
+              }
+              if (wet || chance(0.002)) { set(x, y, E.PLANT); break; }
+            }
+          }
+          stepPowder(x, y, i, id);
+          break;
+        }
+        case E.POWDER: {
+          if (neighborsHot(x, y)) { set(x, y, E.FIRE); explode(x, y, 7); break; }
+          stepPowder(x, y, i, id);
+          break;
+        }
+        case E.NANITE: {
+          // gray goo: slowly converts non-wall neighbors to nanite, decays in acid/fire
+          if (neighborsHot(x, y) && chance(0.3)) { set(x, y, E.SMOKE); break; }
+          if (chance(0.06)) {
+            const dx = (rnd() * 3 | 0) - 1, dy = (rnd() * 3 | 0) - 1;
+            const nx = x + dx, ny = y + dy;
+            if (inb(nx, ny)) {
+              const nid = cells[idx(nx, ny)];
+              if (nid !== E.EMPTY && nid !== E.WALL && nid !== E.NANITE && nid !== E.FIRE && nid !== E.LAVA && nid !== E.ACID) {
+                set(nx, ny, E.NANITE);
+              }
+            }
+          }
+          stepPowder(x, y, i, id);
+          break;
+        }
+        case E.EMBER: {
+          if (life[i] > 0 && --life[i] === 0) { set(x, y, chance(0.5) ? E.SMOKE : E.EMPTY); break; }
+          for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) tryIgnite(x + dx, y + dy, false);
+          stepPowder(x, y, i, id);
+          break;
+        }
+        case E.WATER: {
+          // quench lava; freeze near ice
+          let done = false;
+          for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+            const nx = x + dx, ny = y + dy;
+            if (!inb(nx, ny)) continue;
+            const ni = idx(nx, ny);
+            if (cells[ni] === E.LAVA) { set(nx, ny, E.STONE); set(x, y, E.STEAM); done = true; break; }
+            if (cells[ni] === E.FIRE) { set(nx, ny, E.STEAM); }
+            if (cells[ni] === E.ICE && chance(0.002)) { set(x, y, E.ICE); done = true; break; }
+          }
+          if (!done) stepLiquid(x, y, i, id, 5);
+          break;
+        }
+        case E.BRINE: {
+          for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+            const nx = x + dx, ny = y + dy;
+            if (!inb(nx, ny)) continue;
+            const ni = idx(nx, ny);
+            if (cells[ni] === E.LAVA) { set(nx, ny, E.STONE); set(x, y, E.STEAM); break; }
+            if (cells[ni] === E.FIRE) { set(nx, ny, E.STEAM); }
+          }
+          if (cells[i] === E.BRINE) stepLiquid(x, y, i, id, 5);
+          break;
+        }
+        case E.OIL: {
+          if (neighborsHot(x, y) && chance(0.5)) { set(x, y, E.FIRE); break; }
+          stepLiquid(x, y, i, id, 4);
+          break;
+        }
+        case E.ACID: {
+          let ate = false;
+          for (const [dx, dy] of [[0,1],[1,0],[-1,0],[0,-1]]) {
+            const nx = x + dx, ny = y + dy;
+            if (!inb(nx, ny)) continue;
+            const ni = idx(nx, ny);
+            const nid = cells[ni];
+            if (nid !== E.EMPTY && nid !== E.WALL && nid !== E.ACID && nid !== E.GLASS && nid !== E.FIRE && chance(0.12)) {
+              set(nx, ny, chance(0.25) ? E.SMOKE : E.EMPTY);
+              if (chance(0.35)) { set(x, y, E.EMPTY); ate = true; }
+              break;
+            }
+          }
+          if (!ate) stepLiquid(x, y, i, id, 4);
+          break;
+        }
+        case E.LAVA: {
+          for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+            const nx = x + dx, ny = y + dy;
+            if (!inb(nx, ny)) continue;
+            const ni = idx(nx, ny);
+            const nid = cells[ni];
+            if (nid === E.WATER || nid === E.BRINE) { set(x, y, E.STONE); set(nx, ny, E.STEAM); break; }
+            if (flammableAt(ni)) tryIgnite(nx, ny, chance(0.6));
+            if (nid === E.SAND && chance(0.03)) set(nx, ny, E.GLASS);
+            if (nid === E.ICE) set(nx, ny, E.WATER);
+            if (nid === E.STONE && chance(0.0006)) set(nx, ny, E.LAVA);
+          }
+          if (cells[i] === E.LAVA && chance(0.4)) stepLiquid(x, y, i, id, 2);
+          break;
+        }
+        case E.FIRE: {
+          if (life[i] > 0) life[i]--;
+          for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0],[1,1],[-1,1],[1,-1],[-1,-1]]) {
+            tryIgnite(x + dx, y + dy, false);
+          }
+          if (life[i] === 0) { set(x, y, chance(0.25) ? E.SMOKE : E.EMPTY); break; }
+          // flicker upward
+          if (y > 0 && chance(0.6)) {
+            const nx = x + ((rnd() * 3 | 0) - 1);
+            if (nx >= 0 && nx < W) {
+              const ui = idx(nx, y - 1);
+              if (cells[ui] === E.EMPTY) { swap(i, ui); }
+            }
+          }
+          shade[i] = (rnd() * 4) | 0;
+          break;
+        }
+        case E.SMOKE: case E.STEAM: stepGas(x, y, i, id); break;
+        case E.PLANT: {
+          // grow into adjacent water; creep upward rarely
+          if (chance(0.02)) {
+            const dirs = [[0,-1],[1,0],[-1,0],[0,1]];
+            const [dx, dy] = dirs[(rnd() * 4) | 0];
+            const nx = x + dx, ny = y + dy;
+            if (inb(nx, ny)) {
+              const nid = cells[idx(nx, ny)];
+              if (nid === E.WATER || nid === E.BRINE) set(nx, ny, E.PLANT);
+              else if (nid === E.EMPTY && dy === -1 && chance(0.1)) set(nx, ny, E.PLANT);
+            }
+          }
+          break;
+        }
+        case E.ICE: {
+          if (neighborsHot(x, y) && chance(0.5)) { set(x, y, E.WATER); break; }
+          // spread freeze slowly
+          if (chance(0.005)) {
+            const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+            const [dx, dy] = dirs[(rnd() * 4) | 0];
+            const nx = x + dx, ny = y + dy;
+            if (inb(nx, ny) && cells[idx(nx, ny)] === E.WATER) set(nx, ny, E.ICE);
+          }
+          break;
+        }
+        case E.FUSE: {
+          if (neighborsHot(x, y)) { set(x, y, E.FIRE); }
+          break;
+        }
+        case E.METEOR: {
+          let mx = x, my = y;
+          for (let s = 0; s < 3; s++) {
+            if (my + 1 >= H) { set(mx, my, E.FIRE); explode(mx, my, 9); break; }
+            const bi = idx(mx, my + 1);
+            const bid = cells[bi];
+            if (bid === E.EMPTY || DEF[bid].kind === 3) {
+              swap(idx(mx, my), bi);
+              if (cells[idx(mx, my)] === E.EMPTY && chance(0.6)) set(mx, my, chance(0.5) ? E.FIRE : E.SMOKE);
+              my++;
+            } else {
+              set(mx, my, E.FIRE);
+              explode(mx, my, 9);
+              break;
+            }
+          }
+          break;
+        }
+        case E.CLONE: {
+          if (life[i] === 0) {
+            for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+              const nx = x + dx, ny = y + dy;
+              if (!inb(nx, ny)) continue;
+              const nid = cells[idx(nx, ny)];
+              if (nid !== E.EMPTY && nid !== E.CLONE && nid !== E.WALL && nid !== E.VOID && nid !== E.LIGHTNING) {
+                life[i] = nid; break;
+              }
+            }
+          } else {
+            for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+              const nx = x + dx, ny = y + dy;
+              if (!inb(nx, ny)) continue;
+              if (cells[idx(nx, ny)] === E.EMPTY && chance(0.12)) {
+                const stored = life[i];
+                set(nx, ny, stored);
+                life[i] = stored; // set() on a neighbor never touches i, but keep explicit
+              }
+            }
+          }
+          break;
+        }
+        case E.VOID: {
+          for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+            const nx = x + dx, ny = y + dy;
+            if (!inb(nx, ny)) continue;
+            const ni = idx(nx, ny);
+            if (cells[ni] !== E.EMPTY && cells[ni] !== E.WALL && cells[ni] !== E.VOID) set(nx, ny, E.EMPTY);
+          }
+          break;
+        }
+        case E.LIGHTNING: {
+          if (life[i] > 0) life[i]--;
+          if (life[i] === 0) { set(x, y, E.EMPTY); break; }
+          shade[i] = (rnd() * 4) | 0; // flicker
+          break;
+        }
+        default:
+          if (DEF[id].kind === 1) stepPowder(x, y, i, id);
+          else if (DEF[id].kind === 2) stepLiquid(x, y, i, id, 4);
+      }
+    }
+  }
+}
+
+// bolt: instant strike from (x, 0..y) downward with jitter, ignites & glasses
+function strikeLightning(tx) {
+  let x = tx + ((rnd() * 7 | 0) - 3);
+  x = Math.max(1, Math.min(W - 2, x));
+  for (let y = 0; y < H; y++) {
+    const i = idx(x, y);
+    const id = cells[i];
+    if (id === E.EMPTY || id === E.SMOKE || id === E.STEAM) {
+      set(x, y, E.LIGHTNING);
+    } else {
+      // impact
+      if (id === E.SAND) set(x, y, E.GLASS);
+      else if (id === E.WATER || id === E.BRINE) { set(x, y, E.STEAM); }
+      else if (id === E.POWDER) { set(x, y, E.FIRE); explode(x, y, 8); }
+      else tryIgnite(x, y, true);
+      for (let dx = -2; dx <= 2; dx++) tryIgnite(x + dx, y + 1, false);
+      // ember splash at the point of impact
+      for (let k = 0; k < 6; k++) {
+        const ex = x + ((rnd() * 7 | 0) - 3), ey = y - 1 - (rnd() * 3 | 0);
+        if (inb(ex, ey) && cells[idx(ex, ey)] === E.EMPTY) set(ex, ey, E.EMBER);
+      }
+      break;
+    }
+    x += (rnd() * 3 | 0) - 1;
+    x = Math.max(0, Math.min(W - 1, x));
+  }
+}
+
+// ------------------------------------------------------------------ render --
+const littleEndian = (() => {
+  const b = new ArrayBuffer(4); new Uint32Array(b)[0] = 1;
+  return new Uint8Array(b)[0] === 1;
+})();
+function pack(r, g, b) {
+  return littleEndian ? (255 << 24) | (b << 16) | (g << 8) | r
+                      : (r << 24) | (g << 16) | (b << 8) | 255;
+}
+const COLOR_LUT = []; // [id][shade] -> packed
+for (let id = 0; id < DEF.length; id++) {
+  COLOR_LUT[id] = [];
+  for (let s = 0; s < 4; s++) {
+    const c = DEF[id].colors[s % DEF[id].colors.length];
+    COLOR_LUT[id][s] = pack(c[0], c[1], c[2]);
+  }
+}
+
+function render() {
+  let count = 0;
+  const n = W * H;
+  for (let i = 0; i < n; i++) {
+    const id = cells[i];
+    if (id !== E.EMPTY) count++;
+    img32[i] = COLOR_LUT[id][shade[i] & 3];
+  }
+  particleCount = count;
+  ctx.putImageData(img, 0, 0);
+}
+
+// ------------------------------------------------------------------- paint --
+let painting = false;
+let lastPaint = null;
+let shiftLineStart = null;
+
+function paintAt(gx, gy) {
+  userTouched = true;
+  const r = brush;
+  if (selected === E.LIGHTNING) { strikeLightning(gx); return; }
+  if (selected === E.METEOR) { if (inb(gx, gy) && cells[idx(gx, gy)] === E.EMPTY) set(gx, gy, E.METEOR); return; }
+  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    if (dx * dx + dy * dy > r * r) continue;
+    const x = gx + dx, y = gy + dy;
+    if (!inb(x, y)) continue;
+    const i = idx(x, y);
+    if (selected === E.EMPTY) { set(x, y, E.EMPTY); continue; }
+    if (cells[i] !== E.EMPTY) continue;
+    // powders/liquids sprinkle; solids paint dense
+    const k = DEF[selected].kind;
+    if ((k === 1 || k === 2 || k === 4) && !chance(0.55)) continue;
+    set(x, y, selected);
+  }
+}
+
+function paintLine(x0, y0, x1, y1) {
+  const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+  const steps = Math.max(dx, dy, 1);
+  for (let s = 0; s <= steps; s++) {
+    paintAt(Math.round(x0 + (x1 - x0) * s / steps), Math.round(y0 + (y1 - y0) * s / steps));
+  }
+}
+
+function eventToGrid(e) {
+  const rect = canvas.getBoundingClientRect();
+  const gx = Math.floor((e.clientX - rect.left) / rect.width * W);
+  const gy = Math.floor((e.clientY - rect.top) / rect.height * H);
+  return [gx, gy];
+}
+
+canvas.addEventListener('pointerdown', e => {
+  canvas.setPointerCapture(e.pointerId);
+  painting = true;
+  const [gx, gy] = eventToGrid(e);
+  if (e.shiftKey && lastPaint) { paintLine(lastPaint[0], lastPaint[1], gx, gy); }
+  else paintAt(gx, gy);
+  lastPaint = [gx, gy];
+});
+canvas.addEventListener('pointermove', e => {
+  updateCursor(e);
+  if (!painting) return;
+  const [gx, gy] = eventToGrid(e);
+  if (lastPaint) paintLine(lastPaint[0], lastPaint[1], gx, gy);
+  else paintAt(gx, gy);
+  lastPaint = [gx, gy];
+});
+window.addEventListener('pointerup', () => { painting = false; });
+canvas.addEventListener('pointerleave', () => { cursorEl.style.display = 'none'; });
+
+const cursorEl = document.getElementById('cursor');
+function updateCursor(e) {
+  const stage = document.getElementById('stage');
+  const rect = stage.getBoundingClientRect();
+  const cellPx = canvas.getBoundingClientRect().width / W;
+  const d = Math.max(6, brush * 2 * cellPx);
+  cursorEl.style.display = 'block';
+  cursorEl.style.width = d + 'px';
+  cursorEl.style.height = d + 'px';
+  cursorEl.style.left = (e.clientX - rect.left) + 'px';
+  cursorEl.style.top = (e.clientY - rect.top) + 'px';
+}
+
+// --------------------------------------------------------------------- ui --
+function buildPalette() {
+  const nav = document.getElementById('palette');
+  for (const [label, ids] of PALETTE_GROUPS) {
+    const group = document.createElement('div');
+    group.className = 'group';
+    const gl = document.createElement('div');
+    gl.className = 'group-label';
+    gl.textContent = label;
+    group.appendChild(gl);
+    const sw = document.createElement('div');
+    sw.className = 'swatches';
+    for (const id of ids) {
+      const b = document.createElement('button');
+      b.className = 'swatch';
+      b.dataset.id = id;
+      b.setAttribute('aria-pressed', String(id === selected));
+      const chip = document.createElement('span');
+      chip.className = 'chip';
+      const c = DEF[id].colors[0];
+      chip.style.background = id === E.EMPTY
+        ? 'repeating-linear-gradient(45deg,#3a332a 0 3px,#241f18 3px 6px)'
+        : `rgb(${c[0]},${c[1]},${c[2]})`;
+      const name = document.createElement('span');
+      name.textContent = id === E.EMPTY ? 'erase' : DEF[id].name;
+      b.appendChild(chip); b.appendChild(name);
+      b.addEventListener('click', () => selectElement(id));
+      sw.appendChild(b);
+    }
+    group.appendChild(sw);
+    nav.appendChild(group);
+  }
+}
+function selectElement(id) {
+  selected = id;
+  document.querySelectorAll('.swatch').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.id === id)));
+  document.getElementById('selName').textContent = id === E.EMPTY ? 'erase' : DEF[id].name;
+}
+
+document.getElementById('pauseBtn').addEventListener('click', () => setPaused(!paused));
+function setPaused(p) {
+  paused = p;
+  const b = document.getElementById('pauseBtn');
+  b.setAttribute('aria-pressed', String(p));
+  b.textContent = p ? 'Resume' : 'Pause';
+}
+document.getElementById('stepBtn').addEventListener('click', () => { if (paused) { update(); render(); } });
+document.getElementById('clearBtn').addEventListener('click', () => { cells.fill(0); life.fill(0); });
+document.getElementById('sceneBtn').addEventListener('click', () => buildScene());
+let raining = false;
+document.getElementById('rainBtn').addEventListener('click', () => {
+  raining = !raining;
+  document.getElementById('rainBtn').setAttribute('aria-pressed', String(raining));
+});
+function rainTick() {
+  const drops = Math.max(1, (W / 40) | 0);
+  for (let k = 0; k < drops; k++) {
+    if (!chance(0.7)) continue;
+    const x = (rnd() * W) | 0;
+    if (cells[x] === E.EMPTY) set(x, 0, chance(0.995) ? E.WATER : E.SEED);
+  }
+}
+document.getElementById('helpBtn').addEventListener('click', () => {
+  const h = document.getElementById('help');
+  h.classList.toggle('open');
+  document.getElementById('helpBtn').setAttribute('aria-pressed', String(h.classList.contains('open')));
+});
+document.getElementById('brushUp').addEventListener('click', () => setBrush(brush + 1));
+document.getElementById('brushDown').addEventListener('click', () => setBrush(brush - 1));
+function setBrush(v) {
+  brush = Math.max(1, Math.min(20, v));
+  document.getElementById('brushSize').textContent = brush;
+}
+
+window.addEventListener('keydown', e => {
+  if (e.key === ' ') { e.preventDefault(); setPaused(!paused); }
+  else if (e.key === '[') setBrush(brush - 1);
+  else if (e.key === ']') setBrush(brush + 1);
+  else if (e.key.toLowerCase() === 'e') selectElement(E.EMPTY);
+});
+
+// -------------------------------------------------------------- demo scene --
+function buildScene() {
+  cells.fill(0); life.fill(0);
+  const floor = H - 6;
+  // stone floor
+  for (let y = floor; y < H; y++) for (let x = 0; x < W; x++) set(x, y, E.STONE);
+  // sand dune left
+  for (let x = 0; x < W * 0.34; x++) {
+    const h = Math.floor(Math.sin(x / (W * 0.34) * Math.PI) * H * 0.16) + 3;
+    for (let y = 0; y < h; y++) set(x, floor - 1 - y, E.SAND);
+  }
+  // water basin middle: stone walls
+  const bx0 = Math.floor(W * 0.40), bx1 = Math.floor(W * 0.58);
+  const bd = Math.floor(H * 0.14);
+  for (let y = 0; y < bd; y++) { set(bx0, floor - 1 - y, E.STONE); set(bx1, floor - 1 - y, E.STONE); }
+  for (let x = bx0 + 1; x < bx1; x++) for (let y = 0; y < bd - 2; y++) set(x, floor - 1 - y, E.WATER);
+  // wood cabin right
+  const cx0 = Math.floor(W * 0.68), cx1 = Math.floor(W * 0.82);
+  const ch = Math.floor(H * 0.18);
+  for (let x = cx0; x <= cx1; x++) { set(x, floor - 1, E.WOOD); set(x, floor - 1 - ch, E.WOOD); }
+  for (let y = 0; y <= ch; y++) { set(cx0, floor - 1 - y, E.WOOD); set(cx1, floor - 1 - y, E.WOOD); }
+  // oil pool inside cabin
+  for (let x = cx0 + 1; x < cx1; x++) for (let y = 1; y <= 3; y++) set(x, floor - 1 - y, E.OIL);
+  // fuse from cabin roof up
+  const fx = Math.floor((cx0 + cx1) / 2);
+  for (let y = ch + 1; y < ch + Math.floor(H * 0.2); y++) set(fx, floor - 1 - y, E.FUSE);
+  // gunpowder cache right of cabin
+  for (let x = Math.floor(W * 0.86); x < Math.floor(W * 0.94); x++)
+    for (let y = 1; y < 5; y++) set(x, floor - 1 - y, E.POWDER);
+  // plants on the dune
+  for (let k = 0; k < 6; k++) {
+    const px = Math.floor(rnd() * W * 0.3) + 2;
+    set(px, 2, E.SEED);
+  }
+  // a drizzle of water over the dune
+  for (let k = 0; k < 200; k++) {
+    const px = Math.floor(rnd() * W * 0.34);
+    const py = Math.floor(rnd() * H * 0.2);
+    if (cells[idx(px, py)] === E.EMPTY) set(px, py, E.WATER);
+  }
+}
+
+// -------------------------------------------------------------------- loop --
+let lastT = performance.now(), fpsAcc = 0, fpsN = 0;
+function loop(t) {
+  const dt = t - lastT; lastT = t;
+  fpsAcc += dt; fpsN++;
+  if (fpsAcc >= 500) {
+    document.getElementById('fps').textContent = Math.round(1000 / (fpsAcc / fpsN));
+    document.getElementById('count').textContent = particleCount.toLocaleString();
+    fpsAcc = 0; fpsN = 0;
+  }
+  if (!paused) { if (raining) rainTick(); update(); }
+  render();
+  requestAnimationFrame(loop);
+}
+
+window.addEventListener('resize', resize);
+resize();
+buildPalette();
+buildScene();
+requestAnimationFrame(loop);
+</script>
